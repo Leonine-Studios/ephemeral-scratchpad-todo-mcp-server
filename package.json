@@ -1,20 +1,26 @@
 {
-  "name": "mcp-server-hello",
+  "name": "ephemeral-scratchpad-todo-mcp-server",
   "version": "1.0.0",
-  "description": "A minimal HTTP-based MCP server with a hello world tool",
+  "description": "A session-based MCP server with scratchpad and todo list tools, featuring NanoID sessions, optional X-User-ID validation, and TONL/JSON response encoding",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "inspector": "npx @modelcontextprotocol/inspector"
   },
   "keywords": [
     "mcp",
     "model-context-protocol",
     "ai",
-    "tools"
+    "tools",
+    "scratchpad",
+    "todo",
+    "session"
   ],
   "license": "MIT",
   "engines": {
@@ -22,11 +28,14 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "dotenv": "^17.2.3",
+    "nanoid": "^5.0.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "tsx": "^4.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0"
   }
 }

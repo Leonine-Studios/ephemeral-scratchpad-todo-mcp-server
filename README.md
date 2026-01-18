@@ -1,42 +1,65 @@
-# MCP Hello World Server
+# Ephemeral Scratchpad & Todo MCP Server
 
-A minimal HTTP-based MCP (Model Context Protocol) server built with TypeScript and the official `@modelcontextprotocol/sdk`.
+A session-based MCP (Model Context Protocol) server providing ephemeral scratchpad and todo list functionality for AI agents. Features NanoID-based session isolation, optional X-User-ID security binding, configurable TONL/JSON response encoding, and automatic TTL-based cleanup.
 
 ## Features
 
-- HTTP transport using Streamable HTTP (modern MCP transport)
-- Single `hello_world` tool with Zod schema validation
-- Development mode with hot-reload
-- Production build support
+- **Session-based architecture**: Each agent gets an isolated workspace with unique NanoID
+- **Scratchpad**: Document-based working memory for notes, reasoning trails, and findings
+- **Todo list**: Atomic CRUD operations for task tracking
+- **X-User-ID security**: Optional header binding for multi-user environments (LibreChat compatible)
+- **TONL/JSON encoding**: Configurable token-efficient response format (30-60% token reduction)
+- **TTL cleanup**: Automatic session expiration with configurable lifetime
+- **Multi-agent support**: Designed for remote, multi-user deployments
 
-## Prerequisites
+## Quick Start
 
-- Node.js >= 18.0.0
-- npm
-
-## Installation
+### Installation
 
 ```bash
 npm install
 ```
 
-## Usage
-
-### Development Mode
-
-Run with hot-reload for development:
+### Development
 
 ```bash
 npm run dev
 ```
 
-### Production Mode
-
-Build and run the production version:
+### Production
 
 ```bash
 npm run build
 npm start
+```
+
+### Testing
+
+```bash
+npm test           # Run tests once
+npm run test:watch # Watch mode
+```
+
+## Configuration
+
+Environment variables (create `.env` file or set in shell):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | 3000 | Server port |
+| `HOST` | localhost | Server host |
+| `SESSION_TTL_HOURS` | 24 | Session TTL before auto-cleanup |
+| `RESPONSE_FORMAT` | json | Response encoding: `json` or `tonl` |
+| `NANOID_LENGTH` | 21 | Length of generated NanoIDs |
+
+Example `.env`:
+
+```env
+PORT=3000
+HOST=0.0.0.0
+SESSION_TTL_HOURS=24
+RESPONSE_FORMAT=tonl
+NANOID_LENGTH=21
 ```
 
 ## Endpoints
@@ -44,111 +67,315 @@ npm start
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/mcp` | POST | MCP JSON-RPC endpoint |
-| `/health` | GET | Health check endpoint |
+| `/health` | GET | Health check with session count |
 
 ## Available Tools
 
-### `hello_world`
+### `init_session`
 
-A simple greeting tool that says hello.
+Initialize a new ephemeral session.
 
-**Input Schema:**
+**Input**: None required
+
+**Output** (JSON):
 ```json
 {
-  "name": "string (optional)"
+  "session_id": "V1StGXR8_Z5jdHi6B-myT",
+  "user_id": "user-123",
+  "scratchpad": "",
+  "todos": [],
+  "created_at": "2025-01-18T10:00:00.000Z",
+  "last_modified": "2025-01-18T10:00:00.000Z"
 }
 ```
 
-**Example Request (Initialize):**
-```bash
-curl -X POST http://localhost:3000/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "initialize",
-    "params": {
-      "protocolVersion": "2024-11-05",
-      "capabilities": {},
-      "clientInfo": { "name": "test-client", "version": "1.0.0" }
-    }
-  }'
+**Output** (TONL):
+```
+{id, userId, scratchpadLength, todoCount, createdAt, lastModified}
+id: V1StGXR8_Z5jdHi6B-myT
+userId: user-123
+scratchpadLength: 0
+todoCount: 0
+createdAt: 2025-01-18
+lastModified: 2025-01-18
 ```
 
-**Example Response (SSE format):**
-```
-event: message
-data: {"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{"listChanged":true}},"serverInfo":{"name":"hello-mcp-server","version":"1.0.0"}},"jsonrpc":"2.0","id":1}
-```
+---
 
-> **Note**: The Streamable HTTP transport uses Server-Sent Events (SSE) format. For full MCP client integration, use an MCP-compatible client library or the [MCP Inspector](https://github.com/modelcontextprotocol/inspector).
-```
+### `read_scratchpad`
 
-## Configuration
+Read the scratchpad content.
 
-Environment variables (see `.env.example`):
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | 3000 | Server port |
-| `HOST` | localhost | Server host |
-
-## Project Structure
-
-```
-├── src/
-│   ├── index.ts          # Server entry point
-│   └── tools/
-│       └── hello.ts      # Hello world tool definition
-├── package.json
-├── tsconfig.json
-└── README.md
-```
-
-## Adding New Tools
-
-1. Create a new file in `src/tools/`:
-
-```typescript
-import { z } from "zod";
-
-export const MyToolInputSchema = z.object({
-  // define your input schema
-});
-
-export function myTool(input: z.infer<typeof MyToolInputSchema>) {
-  // implement your tool logic
-  return "result";
+**Input**:
+```json
+{
+  "session_id": "V1StGXR8_Z5jdHi6B-myT"
 }
-
-export const myToolDefinition = {
-  name: "my_tool",
-  description: "Description of what your tool does",
-  inputSchema: MyToolInputSchema,
-  handler: myTool,
-};
 ```
 
-2. Register it in `src/index.ts`:
+**Output** (JSON):
+```json
+{
+  "session_id": "V1StGXR8_Z5jdHi6B-myT",
+  "content_length": 42,
+  "content": "## Notes\n- Working on feature X\n- Found issue Y"
+}
+```
 
-```typescript
-import { myToolDefinition, MyToolInputSchema } from "./tools/myTool.js";
+---
 
-// In createMcpServer():
-server.tool(
-  myToolDefinition.name,
-  myToolDefinition.description,
-  MyToolInputSchema.shape,
-  async (params) => {
-    const validated = MyToolInputSchema.parse(params);
-    const result = myToolDefinition.handler(validated);
-    return {
-      content: [{ type: "text", text: result }],
-    };
+### `write_scratchpad`
+
+Write content to the scratchpad (replaces existing).
+
+**Input**:
+```json
+{
+  "session_id": "V1StGXR8_Z5jdHi6B-myT",
+  "content": "## Updated Notes\n- Completed feature X"
+}
+```
+
+**Output**:
+```json
+{
+  "success": true,
+  "message": "Scratchpad updated successfully",
+  "session_id": "V1StGXR8_Z5jdHi6B-myT",
+  "content_length": 38
+}
+```
+
+---
+
+### `add_todo`
+
+Add a new todo item.
+
+**Input**:
+```json
+{
+  "session_id": "V1StGXR8_Z5jdHi6B-myT",
+  "title": "Implement feature X",
+  "description": "Optional description",
+  "tags": ["backend", "priority"]
+}
+```
+
+**Output** (JSON):
+```json
+{
+  "id": "abc123def456",
+  "title": "Implement feature X",
+  "description": "Optional description",
+  "tags": ["backend", "priority"],
+  "status": "pending",
+  "createdAt": "2025-01-18T10:30:00.000Z"
+}
+```
+
+---
+
+### `list_todos`
+
+List todos with optional filtering.
+
+**Input**:
+```json
+{
+  "session_id": "V1StGXR8_Z5jdHi6B-myT",
+  "filter": "all"
+}
+```
+
+Filter options: `all` (default), `pending`, `done`
+
+**Output** (JSON):
+```json
+[
+  {
+    "id": "abc123def456",
+    "title": "Task 1",
+    "description": "",
+    "tags": ["backend"],
+    "status": "done",
+    "createdAt": "2025-01-18T10:00:00.000Z"
+  },
+  {
+    "id": "xyz789ghi012",
+    "title": "Task 2",
+    "description": "",
+    "tags": [],
+    "status": "pending",
+    "createdAt": "2025-01-18T10:30:00.000Z"
   }
-);
+]
 ```
+
+**Output** (TONL):
+```
+[2]{id, title, status, tags, createdAt}
+abc123def456   Task 1   done      [backend]   2025-01-18
+xyz789ghi012   Task 2   pending   []          2025-01-18
+```
+
+---
+
+### `update_todo`
+
+Update a todo's status.
+
+**Input**:
+```json
+{
+  "session_id": "V1StGXR8_Z5jdHi6B-myT",
+  "todo_id": "abc123def456",
+  "status": "done"
+}
+```
+
+Status options: `pending`, `done`
+
+---
+
+### `delete_todo`
+
+Delete a todo item.
+
+**Input**:
+```json
+{
+  "session_id": "V1StGXR8_Z5jdHi6B-myT",
+  "todo_id": "abc123def456"
+}
+```
+
+**Output**:
+```json
+{
+  "success": true,
+  "message": "Todo deleted successfully",
+  "deleted_id": "abc123def456",
+  "deleted_title": "Task 1"
+}
+```
+
+## X-User-ID Security
+
+For multi-user environments, the server supports optional `X-User-ID` header binding:
+
+### How it works
+
+1. **Session created WITH X-User-ID**: All subsequent requests to that session MUST include the same `X-User-ID` header
+2. **Session created WITHOUT X-User-ID**: No header validation required (backwards compatible)
+
+### LibreChat Integration
+
+Configure MCP in LibreChat with user ID header:
+
+```yaml
+mcp:
+  scratchpad-todo:
+    url: http://localhost:3000/mcp
+    headers:
+      X-User-ID: "{{LIBRECHAT_USER_ID}}"
+```
+
+### Security Benefits
+
+- Prevents session ID guessing attacks
+- Each user's sessions are isolated
+- NanoID + User ID provides strong security without complex auth
+
+## TONL Format
+
+TONL (Token-Optimized Notation Language) reduces token usage by 30-60% compared to JSON:
+
+### Example: Todo List
+
+**JSON** (51 tokens):
+```json
+[
+  {"id": "abc", "title": "Task 1", "status": "done", "tags": ["test"]},
+  {"id": "def", "title": "Task 2", "status": "pending", "tags": []}
+]
+```
+
+**TONL** (29 tokens):
+```
+[2]{id, title, status, tags, createdAt}
+abc   Task 1   done      [test]   2025-01-18
+def   Task 2   pending   []       2025-01-18
+```
+
+Enable TONL by setting `RESPONSE_FORMAT=tonl` in your environment.
+
+## Architecture
+
+```
+src/
+├── index.ts                    # HTTP server entry point
+├── storage/
+│   ├── types.ts                # Session, Todo, SessionStore interface
+│   ├── InMemorySessionStore.ts # In-memory storage with TTL
+│   └── index.ts
+├── tools/
+│   ├── session.ts              # init_session
+│   ├── scratchpad.ts           # read/write scratchpad
+│   ├── todo.ts                 # CRUD operations
+│   └── index.ts
+├── utils/
+│   ├── encoder.ts              # Response format switching
+│   ├── tonl.ts                 # TONL encoder
+│   └── index.ts
+└── __tests__/                  # Unit and integration tests
+```
+
+## Storage Abstraction
+
+The `SessionStore` interface allows swapping storage backends:
+
+```typescript
+interface SessionStore {
+  create(userId?: string): Promise<Session>;
+  get(sessionId: string, userId?: string): Promise<Session | null>;
+  update(sessionId: string, updates: Partial<Session>, userId?: string): Promise<void>;
+  delete(sessionId: string, userId?: string): Promise<void>;
+  exists(sessionId: string): Promise<boolean>;
+  cleanup(): Promise<number>;
+}
+```
+
+Currently implemented: `InMemorySessionStore`
+
+Future: `RedisSessionStore` for distributed deployments
+
+## Use Cases
+
+### Agent Working Memory
+
+```
+1. init_session() → Get session_id
+2. write_scratchpad() → Store reasoning/findings
+3. add_todo() → Break down tasks
+4. [Work on tasks]
+5. update_todo(status: "done") → Mark complete
+6. read_scratchpad() → Review progress
+```
+
+### Multi-Step Workflows
+
+- Track intermediate findings in scratchpad
+- Decompose complex tasks into todos
+- Persist state across tool calls
+- Document blockers and approaches
+
+### Multi-User SaaS
+
+- Deploy single server instance
+- Each user gets isolated sessions via X-User-ID
+- Sessions auto-expire after TTL
+- No database required
 
 ## License
 

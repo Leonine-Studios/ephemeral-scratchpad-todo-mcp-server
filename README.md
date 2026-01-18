@@ -1,4 +1,4 @@
-# Ephemeral Scratchpad & Todo MCP Server
+# Plan and Act MCP
 
 Plan, review, run!  
 Bringing Cursor's planning capabilities for any LLM.
@@ -90,6 +90,29 @@ Create a `.env` file or set environment variables:
 
 All tools require `session_id` (except `init_session`).
 
+## Example: Structured Research Agent
+
+```
+You do web research for a User.
+
+**CRITICAL:**
+At start of an interaction: 
+1. init_session
+2. write startup todos
+Never stop with execution until all todos are done.
+
+**Todos:**
+1. Clarify requirements with user → write specs to scratchpad
+2. Perform research based on specs
+3. perform youtube search about talk shows and discussed points on the research topic
+4. get 3 transcripts of the discussions to get detailed talking points
+5. Output results in agreed format and sources. include talking points from the people in the talkshow
+
+**Scratchpad:** Store user requirements, track search relevance, draft output before presenting. Review scratchpad before final delivery to ensure alignment with original specs.
+
+You are now being connected with a user.
+```
+
 ## Integrations
 
 ### Claude Code
@@ -164,6 +187,11 @@ def456   Task 2   pending   []
 npm test           # Run tests
 npm run test:watch # Watch mode
 ```
+
+## Attribution
+
+Inspired by the [Plan and Act](https://arxiv.org/html/2503.09572v3) Paper
+and [Cursor's planning mode](https://cursor.com/blog/plan-mode)
 
 ## License
 

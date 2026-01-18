@@ -1,9 +1,6 @@
 # Dependencies
 node_modules/
 
-# Source files (not needed in production image, we copy dist/)
-src/
-
 # Build output (rebuilt in Docker)
 dist/
 
